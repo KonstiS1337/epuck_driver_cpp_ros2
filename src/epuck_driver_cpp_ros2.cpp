@@ -24,8 +24,60 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
     
 }
 
+PiPuckRos2::~PiPuckRos2() {
+    close(fh);
+}
+
+void PiPuckRos2::mpu9250_change_addr(void) {
+	if(imu_addr == MPU9250_ADDRESS_AD1_0) {
+		imu_addr = MPU9250_ADDRESS_AD1_1;
+	} else {
+		imu_addr = MPU9250_ADDRESS_AD1_0;
+	}
+	ioctl(fh, I2C_SLAVE, imu_addr);
+}
+
+int PiPuckRos2::read_reg(int file, uint8_t reg, int count, uint8_t *data) {
+	if(write(file, &reg, 1) != 1) {
+		mpu9250_change_addr();
+		if(write(file, &reg, 1) != 1) {
+			perror("imu write error");
+			return -1;
+		}
+	}
+	if(read(file, data, count) != count) {
+		mpu9250_change_addr();
+		if(read(file, data, count) != count) {
+			printf("count=%d\n", count);
+			perror("imu read error");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+bool PiPuckRos2::initConnectionWithRobot(void) {
+
+	// Set the I2C timeout to 20 ms (instead of 1 second). This need to be done on the "switcher" bus channel.
+	int fh1 = open("/dev/i2c-1", O_RDWR);
+	if(ioctl(fh1, I2C_TIMEOUT, 2) < 0) {
+		perror("fail to set i2c1 timeout");
+	}		
+	close(fh1);
+
+	fh = open(I2C_CHANNEL, O_RDWR);
+	if(fh < 0) { // Try with bus number used in older kernel
+		fh = open(LEGACY_I2C_CHANNEL, O_RDWR);	
+		if(fh < 0) {
+			perror("Cannot open I2C device");
+			return false;
+		}
+	}
+	return true;
+}
+
 int main(int argc,char *argv[]) {
-   
+   //TODO init connection with robot with namespace?
    double init_xpos, init_ypos, init_theta;   
    int rosRate = 0;
    int i = 0;
@@ -42,41 +94,15 @@ int main(int argc,char *argv[]) {
     * You must call one of the versions of ros::init() before using any other
     * part of the ROS system.
     */
-    ros::init(argc, argv, "epuck_driver_cpp");
-
-    /**
-    * NodeHandle is the main access point to communications with the ROS system.
-    * The first NodeHandle constructed will fully initialize this node, and the last
-    * NodeHandle destructed will close down the node.
-    */
-    ros::NodeHandle np("~"); // Private.
-    ros::NodeHandle n; // Public.
+    rclcpp::init(argc, argv);
     
-    np.param<std::string>("epuck_name", epuckname, "epuck");
-    np.param("xpos", init_xpos, 0.0);
-    np.param("ypos", init_ypos, 0.0);
-    np.param("theta", init_theta, 0.0);
     np.param("imu", enabledSensors[IMU], false);
     np.param("motor_speed", enabledSensors[MOTOR_SPEED], false);
     np.param("floor", enabledSensors[FLOOR], false);
     np.param("proximity", enabledSensors[PROXIMITY], false);
     np.param("motor_position", enabledSensors[MOTOR_POSITION], false);
     np.param("microphone", enabledSensors[MICROPHONE], false);
-    np.param("ros_rate", rosRate, 20);    
 	np.param("debug", debug_enabled, false);
-	
-    if(DEBUG_ROS_PARAMS) {
-        std::cout << "[" << epuckname << "] " << "epuck name: " << epuckname << std::endl;
-        std::cout << "[" << epuckname << "] " << "init pose: " << init_xpos << ", " << init_ypos << ", " << theta << std::endl;
-        std::cout << "[" << epuckname << "] " << "imu enabled: " << enabledSensors[IMU] << std::endl;
-        std::cout << "[" << epuckname << "] " << "motor speed enabled: " << enabledSensors[MOTOR_SPEED] << std::endl;
-        std::cout << "[" << epuckname << "] " << "floor enabled: " << enabledSensors[FLOOR] << std::endl;
-        std::cout << "[" << epuckname << "] " << "proximity enabled: " << enabledSensors[PROXIMITY] << std::endl;
-        std::cout << "[" << epuckname << "] " << "motor position enabled: " << enabledSensors[MOTOR_POSITION] << std::endl;
-        std::cout << "[" << epuckname << "] " << "microphone enabled: " << enabledSensors[MICROPHONE] << std::endl;
-        std::cout << "[" << epuckname << "] " << "ros rate: " << rosRate << std::endl;
-		std::cout << "[" << epuckname << "] " << "debug enabled: " << debug_enabled << std::endl;
-    }
     
 
     if(initConnectionWithRobot()<0) {

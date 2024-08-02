@@ -163,7 +163,7 @@ class PiPuckRos2 : public rclcpp::Node {
 		bool debug_enabled = false;
 		uint8_t debug_count = 0;
 
-		int initConnectionWithRobot(void);
+		bool initConnectionWithRobot(void);
 		void closeConnection();
 		void updateActuators();
 		void mpu9250_change_addr(void);
