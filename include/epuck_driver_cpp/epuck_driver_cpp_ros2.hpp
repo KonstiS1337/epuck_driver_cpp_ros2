@@ -12,9 +12,13 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/twist.hpp>
-#include <std_msgs/msg/u_int8_multi_array.hpp>
-#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <std_msgs/msg/float32.hpp>
+#include <std_msgs/msg/int32.hpp>
 #include <visualization_msgs/msg/marker.hpp>
+#include <Transform.h>
+#include <transform_broadcaster.h>
+#include <tf2_geometry_msgs.hpp>
 //#include <cv_bridge/cv_bridge.h>
 //#include <opencv/cv.h>
 extern "C" {
@@ -104,8 +108,8 @@ class PiPuckRos2 : public rclcpp::Node {
 		bool initialized() {return initialized_;};
 	private:
 		int fh;
-		char zero_to_epuck_buff[ACTUATORS_SIZE]; 
-		char epuck_to_zero_buff[SENSORS_SIZE];
+		char ros_to_epuck_[ACTUATORS_SIZE]; 
+		char epuck_to_ros_[SENSORS_SIZE];
 		bool enabledSensors[SENSORS_NUM];
 		bool changedActuators[ACTUATORS_NUM];
 		bool initialized_ = false;
@@ -124,17 +128,13 @@ class PiPuckRos2 : public rclcpp::Node {
 		uint8_t selectorData;
 		uint8_t tvRemoteData;
 
-		rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr proxPublisher[8];
-		sensor_msgs::msg::Range proxMsg[8];
+		rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr prox_pub_[8];
+		rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr mic_pub_[4];
+		rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr motor_state_right_pub_;
+		rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr motor_state_left_pub_;
+		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
 		rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr laserPublisher;
-		sensor_msgs::msg::LaserScan laserMsg;
-		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPublisher;
-		nav_msgs::msg::Odometry odomMsg;
-		rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr microphonePublisher;
-		visualization_msgs::msg::Marker microphoneMsg;
-		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPublisher;
-		sensor_msgs::msg::Imu imuMsg;
-		rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr motorSpeedPublisher;
+		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
 		rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr floorPublisher;
 
 		rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSubscriber;
@@ -147,11 +147,11 @@ class PiPuckRos2 : public rclcpp::Node {
 		double xPos, yPos, theta;
 		double deltaSteps, deltaTheta;
 		rclcpp::Time currentTime, lastTime, currentTimeMap, lastTimeMap;
+		std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
 		int overflowCountLeft = 0, overflowCountRight = 0;
 
 		uint8_t imu_addr = MPU9250_ADDRESS_AD1_0;
-		uint8_t accData[6];
-		uint8_t gyroData[6];
+		
 		uint8_t temperatureData;
 		int16_t accValue[3];
 		int32_t accSum[3] = {0, 0, 0};
@@ -164,6 +164,7 @@ class PiPuckRos2 : public rclcpp::Node {
 		uint8_t debug_count = 0;
 
 		bool initConnectionWithRobot(void);
+		bool i2cDataExchange();
 		void closeConnection();
 		void updateActuators();
 		void mpu9250_change_addr(void);
@@ -171,8 +172,14 @@ class PiPuckRos2 : public rclcpp::Node {
 		void calibrateAcc();
 		void calibrateGyro();
 		int update_robot_sensors_and_actuators();
-		void updateSensorsData();
+		void updateRobotState();
 		void updateRosInfo();
 		void handlerVelocity(const geometry_msgs::msg::Twist::ConstPtr& msg);
 		void handlerLED(const std_msgs::msg::UInt8MultiArray::ConstPtr& msg);
+		void publishProximityData();
+		void publishMicrophoneData();
+		void proximityTf();
+		void publishMotorPosition();
+		void publishImu();
+		void publishOdometry();
 }

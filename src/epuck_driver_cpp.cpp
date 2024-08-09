@@ -371,61 +371,62 @@ void updateRosInfo() {
         tf::Transform transform;
         tf::Quaternion q;
         
-        transform.setOrigin( tf::Vector3(0.035, -0.010, 0.034) );        
-        q.setRPY(0, 0, 6.11);
-        transform.setRotation(q);        
-        parent << epuckname << "/base_prox0";
-        child << epuckname << "/base_link";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // TF tree stuff
+        // transform.setOrigin( tf::Vector3(0.035, -0.010, 0.034) );        
+        // q.setRPY(0, 0, 6.11);
+        // transform.setRotation(q);        
+        // parent << epuckname << "/base_prox0";
+        // child << epuckname << "/base_link";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
-        transform.setOrigin( tf::Vector3(0.025, -0.025, 0.034) );        
-        q.setRPY(0, 0, 5.59);
-        transform.setRotation(q);
-        parent.str("");
-        parent << epuckname << "/base_prox1";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // transform.setOrigin( tf::Vector3(0.025, -0.025, 0.034) );        
+        // q.setRPY(0, 0, 5.59);
+        // transform.setRotation(q);
+        // parent.str("");
+        // parent << epuckname << "/base_prox1";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
-        transform.setOrigin( tf::Vector3(0.000, -0.030, 0.034) );        
-        q.setRPY(0, 0, 4.71);
-        transform.setRotation(q);
-        parent.str("");
-        parent << epuckname << "/base_prox2";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // transform.setOrigin( tf::Vector3(0.000, -0.030, 0.034) );        
+        // q.setRPY(0, 0, 4.71);
+        // transform.setRotation(q);
+        // parent.str("");
+        // parent << epuckname << "/base_prox2";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
-        transform.setOrigin( tf::Vector3(-0.035, -0.020, 0.034) );        
-        q.setRPY(0, 0, 3.49);
-        transform.setRotation(q);
-        parent.str("");
-        parent << epuckname << "/base_prox3";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // transform.setOrigin( tf::Vector3(-0.035, -0.020, 0.034) );        
+        // q.setRPY(0, 0, 3.49);
+        // transform.setRotation(q);
+        // parent.str("");
+        // parent << epuckname << "/base_prox3";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
-        transform.setOrigin( tf::Vector3(-0.035, 0.020, 0.034) );        
-        q.setRPY(0, 0, 2.8);
-        transform.setRotation(q);
-        parent.str("");
-        parent << epuckname << "/base_prox4";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // transform.setOrigin( tf::Vector3(-0.035, 0.020, 0.034) );        
+        // q.setRPY(0, 0, 2.8);
+        // transform.setRotation(q);
+        // parent.str("");
+        // parent << epuckname << "/base_prox4";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
-        transform.setOrigin( tf::Vector3(0.000, 0.030, 0.034) );        
-        q.setRPY(0, 0, 1.57);
-        transform.setRotation(q);
-        parent.str("");
-        parent << epuckname << "/base_prox5";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // transform.setOrigin( tf::Vector3(0.000, 0.030, 0.034) );        
+        // q.setRPY(0, 0, 1.57);
+        // transform.setRotation(q);
+        // parent.str("");
+        // parent << epuckname << "/base_prox5";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
-        transform.setOrigin( tf::Vector3(0.025, 0.025, 0.034) );        
-        q.setRPY(0, 0, 0.70);
-        transform.setRotation(q);
-        parent.str("");
-        parent << epuckname << "/base_prox6";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // transform.setOrigin( tf::Vector3(0.025, 0.025, 0.034) );        
+        // q.setRPY(0, 0, 0.70);
+        // transform.setRotation(q);
+        // parent.str("");
+        // parent << epuckname << "/base_prox6";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
-        transform.setOrigin( tf::Vector3(0.035, 0.010, 0.034) );        
-        q.setRPY(0, 0, 0.17);
-        transform.setRotation(q);
-        parent.str("");
-        parent << epuckname << "/base_prox7";
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
+        // transform.setOrigin( tf::Vector3(0.035, 0.010, 0.034) );        
+        // q.setRPY(0, 0, 0.17);
+        // transform.setRotation(q);
+        // parent.str("");
+        // parent << epuckname << "/base_prox7";
+        // br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), child.str(), parent.str()));
         
 
         currentTimeMap = ros::Time::now();
