@@ -15,24 +15,105 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
     this->declare_parameter<bool>("proximity",false);
     this->declare_parameter<bool>("motor_position",false);
     this->declare_parameter<bool>("microphone",false);
-    this->declare_parameter<bool>("debug",false);
     this->declare_parameter<int>("ros_rate",20);
+    this->declare_parameter<std::string>("epuck_name","");
+    //Robot control parameters
+    this->declare_parameter<int>("right_motor_speed",0);
+    this->declare_parameter<int>("left_motor_speed",0);
+    this->declare_parameter<int>("speaker_sound_id",0);
+    this->declare_parameter<int>("normal_led",0);
+    this->declare_parameter<std::vector<int>>("rgb_led_2",std::vector<int>{0,0,0});
+    this->declare_parameter<std::vector<int>>("rgb_led_4",std::vector<int>{0,0,0});
+    this->declare_parameter<std::vector<int>>("rgb_led_6",std::vector<int>{0,0,0});
+    this->declare_parameter<std::vector<int>>("rgb_led_8",std::vector<int>{0,0,0});
+    this->declare_parameter<int>("settings",0);
+
+    //adding parameter event handler to react to parameter updates
+    param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
+    cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("right_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("left_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_speaker_sound_id_ = param_subscriber_->add_parameter_callback("speaker_sound_id",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_normal_led_ = param_subscriber_->add_parameter_callback("normal_led",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_rgb_led_2_ = param_subscriber_->add_parameter_callback("rgb_led_2",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_rgb_led_4_ = param_subscriber_->add_parameter_callback("rgb_led_4",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_rgb_led_6_ = param_subscriber_->add_parameter_callback("rgb_led_6",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_rgb_led_8_ = param_subscriber_->add_parameter_callback("rgb_led_8",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    cb_settings_ = param_subscriber_->add_parameter_callback("settings",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
 
     broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
     // Pubs, subs and timers
-    //TODO add epuck name
-    for( int i = 0; i < 8; i++) prox_pub_[i] = this->create_publisher<sensor_msgs::msg::Range>("/proximity_sensor_" + std::to_string(i),1);
-    for( int i = 0; i < 4; i++) mic_pub_[i] = this->create_publisher<std_msgs::msg::Float32>("/microphone_" + std::to_string(i),1);
-    motor_state_right_pub_ = this->create_publisher<std_msgs::msg::Int32>("/motor_state_right",1);
-    motor_state_left_pub_ = this->create_publisher<std_msgs::msg::Int32>("/motor_state_left",1);
-    laserPublisher = this->create_publisher<sensor_msgs::msg::LaserScan>("/tof_sensor",1);
-    odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/odom",1);
-    
+    std::string epuck_name = this->get_parameter("epuck_name").as_string();
+    for( int i = 0; i < 8; i++) prox_pub_[i] = this->create_publisher<sensor_msgs::msg::Range>(epuck_name + "/proximity_sensor_" + std::to_string(i),1);
+    for( int i = 0; i < 4; i++) mic_pub_[i] = this->create_publisher<std_msgs::msg::Float32>(epuck_name + "/microphone_" + std::to_string(i),1);
+    motor_state_right_pub_ = this->create_publisher<std_msgs::msg::Int32>(epuck_name + "/motor_state_right",1);
+    motor_state_left_pub_ = this->create_publisher<std_msgs::msg::Int32>(epuck_name + "/motor_state_left",1);
+    odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(epuck_name + "/odom",1);
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(100),std::bind(&PiPuckRos2::updateRobotState,this));
+
+    //Loading values
+    theta = this->get_parameter("theta").as_double();
+    xPos = this->get_parameter("xPos").as_double();
+    yPos = this->get_parameter("yPos").as_double();
 }
 
 PiPuckRos2::~PiPuckRos2() {
     close(fh);
+}
+
+void PiPuckRos2::updateParameterCb(const rclcpp::Parameter & p) {
+    if(p.get_name() == "right_motor_speed") {
+        right_motor_speed_ = p.as_int();
+        ros_to_epuck_[2] = right_motor_speed_&0xFF;
+		ros_to_epuck_[3] = right_motor_speed_>>8;
+
+    }
+    else if(p.get_name() == "left_motor_speed") {
+        left_motor_speed_ = p.as_int();
+        ros_to_epuck_[0] = left_motor_speed_&0xFF;
+		ros_to_epuck_[1] = left_motor_speed_>>8;
+    }
+    else if(p.get_name() == "speaker_sound_id") {
+        speaker_sound_id_ = p.as_int();
+        ros_to_epuck_[4] = speaker_sound_id_;
+    }
+    else if(p.get_name() == "normal_led") {
+        normal_led_ = p.as_int();
+        ros_to_epuck_[5] = normal_led_;
+    }
+    else if(p.get_name() == "rgb_led_2") {
+        std::vector<long> new_values_ = p.as_integer_array();
+        std::copy(new_values_.begin(),new_values_.end(),rgb_led_2_);
+        ros_to_epuck_[6] = rgb_led_2_[0];
+        ros_to_epuck_[7] = rgb_led_2_[1];
+        ros_to_epuck_[8] = rgb_led_2_[2];
+    }
+    else if(p.get_name() == "rgb_led_4") {
+        std::vector<long> new_values_ = p.as_integer_array();
+        std::copy(new_values_.begin(),new_values_.end(),rgb_led_4_);
+        ros_to_epuck_[9] = rgb_led_4_[0];
+        ros_to_epuck_[10] = rgb_led_4_[1];
+        ros_to_epuck_[11] = rgb_led_4_[2];
+    }
+    else if(p.get_name() == "rgb_led_6") {
+        std::vector<long> new_values_ = p.as_integer_array();
+        std::copy(new_values_.begin(),new_values_.end(),rgb_led_6_);
+        ros_to_epuck_[12] = rgb_led_6_[0];
+        ros_to_epuck_[13] = rgb_led_6_[1];
+        ros_to_epuck_[14] = rgb_led_6_[2];
+    }
+    else if(p.get_name() == "rgb_led_8") {
+        std::vector<long> new_values_ = p.as_integer_array();
+        std::copy(new_values_.begin(),new_values_.end(),rgb_led_8_);
+        ros_to_epuck_[15] = rgb_led_8_[0];
+        ros_to_epuck_[16] = rgb_led_8_[1];
+        ros_to_epuck_[17] = rgb_led_8_[2];
+    }
+    else if(p.get_name() == "settings") {
+        settings_ = p.as_int();
+        ros_to_epuck_[18] = settings_;
+    }
+    return;
 }
 
 void PiPuckRos2::mpu9250_change_addr(void) {
@@ -308,9 +389,9 @@ void PiPuckRos2::updateRobotState() {
     memset(epuck_to_ros_,0x0,SENSORS_SIZE);
     uint8_t checksum = 0;
 	for(int i=0; i<(ACTUATORS_SIZE-1); i++) {
-	    checksum ^= epuck_to_ros_[i];
+	    checksum ^= ros_to_epuck_[i];
     }
-	epuck_to_ros_[ACTUATORS_SIZE-1] = checksum;
+	ros_to_epuck_[ACTUATORS_SIZE-1] = checksum;
 
     if(!i2cDataExchange()) return; //data exchange failed -> not publishing new data
 
@@ -333,7 +414,6 @@ void PiPuckRos2::updateRobotState() {
 
     if(this->get_parameter("imu").as_bool()) publishImu();
     if(this->get_parameter("odometry").as_bool()) publishOdometry();
-
     return;
 }
 
@@ -374,133 +454,53 @@ bool PiPuckRos2::i2cDataExchange() {
 	}
 }
 
+void PiPuckRos2::calibrateAcc() {
+	int samplesCount=0, i=0;
+	// reset and send configuration first?
+	for(i=0; i<NUM_SAMPLES_CALIBRATION; i++) {
+		if(read_reg(fh, ACCEL_XOUT_H, 6, accData) == 0) {	// for MPU9250 set just the address also for a multiple read with autoincrement
+			accSum[0] += (int16_t)(accData[1] + (accData[0]<<8)); // MPU9250 big-endian
+			accSum[1] += (int16_t)(accData[3] + (accData[2]<<8));
+			accSum[2] += (int16_t)(accData[5] + (accData[4]<<8));
+			samplesCount++;
+			//printf("acc sums: x=%d, y=%d, z=%d (samples=%d)\n", accSum[0], accSum[1], accSum[2], samplesCount);
+		}
+	}
+	accOffset[0] = (int16_t)((float)accSum[0]/(float)samplesCount);
+	accOffset[1] = (int16_t)((float)accSum[1]/(float)samplesCount);
+	accOffset[2] = (int16_t)((float)accSum[2]/(float)samplesCount);
+	RCLCPP_INFO(this->get_logger(),"acc offsets: x=%d, y=%d, z=%d (samples=%d)\n", accOffset[0], accOffset[1], accOffset[2], samplesCount);
+
+}
+
+void PiPuckRos2::calibrateGyro() {
+	int samplesCount=0, i=0;
+	// reset and send configuration first?
+	for(i=0; i<NUM_SAMPLES_CALIBRATION; i++) {
+		if(read_reg(fh, GYRO_XOUT_H, 6, gyroData) == 0) {	// // for MPU9250 set just the address also for a multiple read with autoincrement
+			gyroSum[0] += (int16_t)(gyroData[1] + (gyroData[0]<<8)); // MPU9250 big-endian
+			gyroSum[1] += (int16_t)(gyroData[3] + (gyroData[2]<<8));
+			gyroSum[2] += (int16_t)(gyroData[5] + (gyroData[4]<<8));
+			samplesCount++;
+			//printf("gyro sums: x=%d, y=%d, z=%d (samples=%d)\n", gyroSum[0], gyroSum[1], gyroSum[2], samplesCount);
+		}
+	}
+	gyroOffset[0] = (int16_t)((float)gyroSum[0]/(float)samplesCount);
+	gyroOffset[1] = (int16_t)((float)gyroSum[1]/(float)samplesCount);
+	gyroOffset[2] = (int16_t)((float)gyroSum[2]/(float)samplesCount);
+	RCLCPP_INFO(this->get_logger(),"gyro offsets: x=%d, y=%d, z=%d (samples=%d)\n", gyroOffset[0], gyroOffset[1], gyroOffset[2], samplesCount);
+}
+
 int main(int argc,char *argv[]) {
-   //TODO init connection with robot with namespace?
-   double init_xpos, init_ypos, init_theta;   
-   int rosRate = 0;
-   int i = 0;
-   
-   	ros_to_epuck_[4] = 0; // Speaker => 0 = no sound.
-   
-    /**
-    * The ros::init() function needs to see argc and argv so that it can perform
-    * any ROS arguments and name remapping that were provided at the command line.
-    * For programmatic remappings you can use a different version of init() which takes
-    * remappings directly, but for most command-line programs, passing argc and argv is
-    * the easiest way to do it.  The third argument to init() is the name of the node.
-    *
-    * You must call one of the versions of ros::init() before using any other
-    * part of the ROS system.
-    */
     rclcpp::init(argc, argv);
-    
-    np.param("imu", enabledSensors[IMU], false);
-    np.param("motor_speed", enabledSensors[MOTOR_SPEED], false);
-    np.param("floor", enabledSensors[FLOOR], false);
-    np.param("proximity", enabledSensors[PROXIMITY], false);
-    np.param("motor_position", enabledSensors[MOTOR_POSITION], false);
-    np.param("microphone", enabledSensors[MICROPHONE], false);
-	np.param("debug", debug_enabled, false);
-    
+    std::shared_ptr<PiPuckRos2> node = std::make_shared<PiPuckRos2>();
 
-    if(initConnectionWithRobot()<0) {
-		return -1;
+    if(node->initialize()) {
+		rclcpp::spin(node);
     }
+    else RCLCPP_ERROR(node->get_logger(),"Initialization of node failed -> shuting down.");
     
-    if(enabledSensors[IMU]) {
-		ioctl(fh, I2C_SLAVE, imu_addr);	
-		calibrateAcc();
-		calibrateGyro();
-        imuPublisher = n.advertise<sensor_msgs::Imu>("imu", 10);
-    }
-    if(enabledSensors[MOTOR_SPEED]) {
-        motorSpeedPublisher = n.advertise<visualization_msgs::Marker>("motor_speed", 10);
-    }
-    if(enabledSensors[FLOOR]) {
-        floorPublisher = n.advertise<visualization_msgs::Marker>("floor", 10);
-    }
-    if(enabledSensors[PROXIMITY]) {
-        for(i=0; i<8; i++) {
-            /**
-            * The advertise() function is how you tell ROS that you want to
-            * publish on a given topic name. This invokes a call to the ROS
-            * master node, which keeps a registry of who is publishing and who
-            * is subscribing. After this advertise() call is made, the master
-            * node will notify anyone who is trying to subscribe to this topic name,
-            * and they will in turn negotiate a peer-to-peer connection with this
-            * node.  advertise() returns a Publisher object which allows you to
-            * publish messages on that topic through a call to publish().  Once
-            * all copies of the returned Publisher object are destroyed, the topic
-            * will be automatically unadvertised.
-            *
-            * The second parameter to advertise() is the size of the message queue
-            * used for publishing messages.  If messages are published more quickly
-            * than we can send them, the number here specifies how many messages to
-            * buffer up before throwing some away.
-            */
-            std::stringstream ss;
-            ss.str("");
-            ss << "proximity" << i;
-            proxPublisher[i] = n.advertise<sensor_msgs::Range>(ss.str(), 10);
-            //proxMsg[i] = new sensor_msgs::Range();
-            proxMsg[i].radiation_type = sensor_msgs::Range::INFRARED;
-            ss.str("");
-            ss << epuckname << "/base_prox" << i;
-            proxMsg[i].header.frame_id =  ss.str();
-            proxMsg[i].field_of_view = 0.26;    // About 15 degrees...to be checked!
-            proxMsg[i].min_range = 0.005;       // 0.5 cm.
-            proxMsg[i].max_range = 0.05;        // 5 cm.                    
-        }       
-        
-        laserPublisher = n.advertise<sensor_msgs::LaserScan>("scan", 10);
-    }
-    if(enabledSensors[MOTOR_POSITION]) {
-        odomPublisher = n.advertise<nav_msgs::Odometry>("odom", 10);
-        currentTime = ros::Time::now();
-        lastTime = ros::Time::now();        
-    }
-    if(enabledSensors[MICROPHONE]) {
-        microphonePublisher = n.advertise<visualization_msgs::Marker>("microphone", 10);
-    }
-       
-    /**
-    * The subscribe() call is how you tell ROS that you want to receive messages
-    * on a given topic.  This invokes a call to the ROS
-    * master node, which keeps a registry of who is publishing and who
-    * is subscribing.  Messages are passed to a callback function, here
-    * called handlerVelocity.  subscribe() returns a Subscriber object that you
-    * must hold on to until you want to unsubscribe.  When all copies of the Subscriber
-    * object go out of scope, this callback will automatically be unsubscribed from
-    * this topic.
-    *
-    * The second parameter to the subscribe() function is the size of the message
-    * queue.  If messages are arriving faster than they are being processed, this
-    * is the number of messages that will be buffered up before beginning to throw
-    * away the oldest ones.
-    */
-    cmdVelSubscriber = n.subscribe("mobile_base/cmd_vel", 10, handlerVelocity);
-    cmdLedSubscriber = n.subscribe("mobile_base/cmd_led", 10, handlerLED);
-   
-    theta = init_theta;
-    xPos = init_xpos;
-    yPos = init_ypos;
-
-    ros::Rate loop_rate(rosRate);
-   
-    while (ros::ok()) {
-        updateSensorsData();
-        updateRosInfo();
-        updateActuators();
-        ros::spinOnce();
-        loop_rate.sleep();    // Do not call "sleep" otherwise the bluetooth communication will hang.
-                                // We communicate as fast as possible, this shouldn't be a problem...
-        if(consecutiveReadTimeout >= MAX_CONSECUTIVE_TIMEOUT) { // We have connection problems, stop here.
-            break;
-        }
-    }
-
-    closeConnection();
-    
+    return 0;
 }
 
 

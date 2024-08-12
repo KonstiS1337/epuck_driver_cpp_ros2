@@ -34,22 +34,12 @@ extern "C" {
 	#include <unistd.h>
 }
 
-#define DEBUG_CONNECTION_INIT 1
-#define DEBUG_ROS_PARAMS 1
-#define DEBUG_UPDATE_SENSORS_TIMING 0
-#define DEBUG_UPDATE_SENSORS_DATA 0
-#define DEBUG_COMMUNICATION_ERROR 1
-#define DEBUG_ODOMETRY 0
-#define DEBUG_IMU 0
-#define DEBUG_SPEED_RECEIVED 0
-#define DEBUG_LED_RECEIVED 0
 
 #define I2C_CHANNEL "/dev/i2c-12"
 #define LEGACY_I2C_CHANNEL "/dev/i2c-4"
 
 #define READ_TIMEOUT_SEC 10    // 10 seconds, keep it high to avoid desynchronize when there are communication delays due to Bluetooth.
 #define READ_TIMEOUT_USEC 0
-#define MAX_CONSECUTIVE_TIMEOUT 3
 
 #define SENSORS_NUM 10
 #define IMU 0
@@ -105,17 +95,17 @@ class PiPuckRos2 : public rclcpp::Node {
 	public:
 		PiPuckRos2();
 		~PiPuckRos2();
-		bool initialized() {return initialized_;};
+		bool initialize() {
+			ioctl(fh, I2C_SLAVE, imu_addr);
+			calibrateAcc();
+			calibrateGyro();
+			return initConnectionWithRobot() && initialized_;};
 	private:
+
 		int fh;
 		char ros_to_epuck_[ACTUATORS_SIZE]; 
 		char epuck_to_ros_[SENSORS_SIZE];
-		bool enabledSensors[SENSORS_NUM];
-		bool changedActuators[ACTUATORS_NUM];
 		bool initialized_ = false;
-		int speedLeft = 0, speedRight = 0;
-		unsigned char ledState[LEDS_NUM] = {0, 0, 0, 0};
-		unsigned char rgbLedState[RGB_LEDS_NUM][3];
 		int stepsLeft = 0, stepsRight = 0;
 		std::string epuckname;
 		struct timeval currentTime2, lastTime2;
@@ -125,6 +115,8 @@ class PiPuckRos2 : public rclcpp::Node {
 		int proxData[8];
 		int motorPositionData[2];
 		int micData[4];
+		int rgb_led_2_[3] = {0,0,0}, rgb_led_4_[3] = {0,0,0}, rgb_led_6_[3] = {0,0,0}, rgb_led_8_[3] = {0,0,0};
+		
 		uint8_t selectorData;
 		uint8_t tvRemoteData;
 
@@ -133,12 +125,10 @@ class PiPuckRos2 : public rclcpp::Node {
 		rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr motor_state_right_pub_;
 		rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr motor_state_left_pub_;
 		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
-		rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr laserPublisher;
 		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-		rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr floorPublisher;
-
-		rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSubscriber;
-		rclcpp::Subscription<std_msgs::msg::UInt8MultiArray>::SharedPtr cmdLedSubscriber;
+		std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
+		std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_right_motor_speed_, cb_left_motor_speed_, cb_speaker_sound_id_, cb_normal_led_, cb_rgb_led_2_, cb_rgb_led_4_, cb_rgb_led_6_, cb_rgb_led_8_, cb_settings_;
+		rclcpp::TimerBase::SharedPtr timer_;
 
 		double leftStepsDiff = 0, rightStepsDiff = 0;
 		double leftStepsPrev = 0, rightStepsPrev = 0;
@@ -146,13 +136,12 @@ class PiPuckRos2 : public rclcpp::Node {
 		signed long int motorPositionDataCorrect[2];
 		double xPos, yPos, theta;
 		double deltaSteps, deltaTheta;
-		rclcpp::Time currentTime, lastTime, currentTimeMap, lastTimeMap;
+		rclcpp::Time currentTime, lastTime;
 		std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
-		int overflowCountLeft = 0, overflowCountRight = 0;
+		int overflowCountLeft = 0, overflowCountRight = 0, right_motor_speed_ = 0, left_motor_speed_ = 0,speaker_sound_id_ = 0, normal_led_ = 0,  settings_ = 0;
 
 		uint8_t imu_addr = MPU9250_ADDRESS_AD1_0;
 		
-		uint8_t temperatureData;
 		int16_t accValue[3];
 		int32_t accSum[3] = {0, 0, 0};
 		int16_t accOffset[3] = {0, 0, 0};
@@ -160,26 +149,21 @@ class PiPuckRos2 : public rclcpp::Node {
 		int32_t gyroSum[3] = {0, 0, 0};
 		int16_t gyroOffset[3] = {0, 0, 0};
 
-		bool debug_enabled = false;
-		uint8_t debug_count = 0;
 
 		bool initConnectionWithRobot(void);
 		bool i2cDataExchange();
-		void closeConnection();
-		void updateActuators();
 		void mpu9250_change_addr(void);
 		int read_reg(int file, uint8_t reg, int count, uint8_t *data);
 		void calibrateAcc();
 		void calibrateGyro();
-		int update_robot_sensors_and_actuators();
 		void updateRobotState();
-		void updateRosInfo();
-		void handlerVelocity(const geometry_msgs::msg::Twist::ConstPtr& msg);
-		void handlerLED(const std_msgs::msg::UInt8MultiArray::ConstPtr& msg);
 		void publishProximityData();
 		void publishMicrophoneData();
 		void proximityTf();
 		void publishMotorPosition();
 		void publishImu();
 		void publishOdometry();
+		void updateParameterCb(const rclcpp::Parameter & p);
+		void calibrateGyro();
+		void calibrateAcc();
 }
