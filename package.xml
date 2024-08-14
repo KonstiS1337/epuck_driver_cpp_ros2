@@ -1,8 +1,10 @@
 <?xml version="1.0"?>
-<package>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
   <name>epuck_driver_cpp_ros2</name>
   <version>0.0.0</version>
   <description>The epuck_driver_cpp package ported to ros2</description>
+  <maintainer email="konstantin.stute@stud.tu-darmstadt.de">ks</maintainer>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->
