@@ -5,6 +5,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rcl_interfaces/msg/ParameterEvent.hpp>
 #include <sensor_msgs/msg/range.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -15,9 +16,9 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/int32.hpp>
-#include <Transform.h>
-#include <transform_broadcaster.h>
-#include <tf2_geometry_msgs.hpp>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2/convert.h>
 //#include <cv_bridge/cv_bridge.h>
 //#include <opencv/cv.h>
 extern "C" {
@@ -115,7 +116,9 @@ class PiPuckRos2 : public rclcpp::Node {
 		int motorPositionData[2];
 		int micData[4];
 		int rgb_led_2_[3] = {0,0,0}, rgb_led_4_[3] = {0,0,0}, rgb_led_6_[3] = {0,0,0}, rgb_led_8_[3] = {0,0,0};
-		
+		uint8_t accData[6];
+    	uint8_t gyroData[6];
+
 		uint8_t selectorData;
 		uint8_t tvRemoteData;
 
@@ -125,8 +128,9 @@ class PiPuckRos2 : public rclcpp::Node {
 		rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr motor_state_left_pub_;
 		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
 		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-		std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
-		std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_right_motor_speed_, cb_left_motor_speed_, cb_speaker_sound_id_, cb_normal_led_, cb_rgb_led_2_, cb_rgb_led_4_, cb_rgb_led_6_, cb_rgb_led_8_, cb_settings_;
+		rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr parameter_event_subscriber_;
+		//std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
+		//std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_right_motor_speed_, cb_left_motor_speed_, cb_speaker_sound_id_, cb_normal_led_, cb_rgb_led_2_, cb_rgb_led_4_, cb_rgb_led_6_, cb_rgb_led_8_, cb_settings_;
 		rclcpp::TimerBase::SharedPtr timer_;
 
 		double leftStepsDiff = 0, rightStepsDiff = 0;
@@ -153,8 +157,6 @@ class PiPuckRos2 : public rclcpp::Node {
 		bool i2cDataExchange();
 		void mpu9250_change_addr(void);
 		int read_reg(int file, uint8_t reg, int count, uint8_t *data);
-		void calibrateAcc();
-		void calibrateGyro();
 		void updateRobotState();
 		void publishProximityData();
 		void publishMicrophoneData();
@@ -165,4 +167,4 @@ class PiPuckRos2 : public rclcpp::Node {
 		void updateParameterCb(const rclcpp::Parameter & p);
 		void calibrateGyro();
 		void calibrateAcc();
-}
+};

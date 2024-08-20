@@ -13,10 +13,11 @@ find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
-
+find_package(i2c)
 # building
 add_executable(${PROJECT_NAME}_node src/epuck_driver_cpp_ros2.cpp)
 target_include_directories(${PROJECT_NAME}_node PRIVATE include)
+target_link_libraries(${PROJECT_NAME}_node i2c)
 
 
 # Installing node

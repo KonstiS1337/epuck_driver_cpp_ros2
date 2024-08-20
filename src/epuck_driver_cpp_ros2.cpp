@@ -22,23 +22,27 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
     this->declare_parameter<int>("left_motor_speed",0);
     this->declare_parameter<int>("speaker_sound_id",0);
     this->declare_parameter<int>("normal_led",0);
-    this->declare_parameter<std::vector<int>>("rgb_led_2",std::vector<int>{0,0,0});
-    this->declare_parameter<std::vector<int>>("rgb_led_4",std::vector<int>{0,0,0});
-    this->declare_parameter<std::vector<int>>("rgb_led_6",std::vector<int>{0,0,0});
-    this->declare_parameter<std::vector<int>>("rgb_led_8",std::vector<int>{0,0,0});
+    this->declare_parameter<std::vector<int64_t>>("rgb_led_2",std::vector<int64_t>{0,0,0});
+    this->declare_parameter<std::vector<int64_t>>("rgb_led_4",std::vector<int64_t>{0,0,0});
+    this->declare_parameter<std::vector<int64_t>>("rgb_led_6",std::vector<int64_t>{0,0,0});
+    this->declare_parameter<std::vector<int64_t>>("rgb_led_8",std::vector<int64_t>{0,0,0});
     this->declare_parameter<int>("settings",0);
 
     //adding parameter event handler to react to parameter updates
-    param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
-    cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("right_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("left_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_speaker_sound_id_ = param_subscriber_->add_parameter_callback("speaker_sound_id",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_normal_led_ = param_subscriber_->add_parameter_callback("normal_led",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_rgb_led_2_ = param_subscriber_->add_parameter_callback("rgb_led_2",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_rgb_led_4_ = param_subscriber_->add_parameter_callback("rgb_led_4",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_rgb_led_6_ = param_subscriber_->add_parameter_callback("rgb_led_6",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_rgb_led_8_ = param_subscriber_->add_parameter_callback("rgb_led_8",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    cb_settings_ = param_subscriber_->add_parameter_callback("settings",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    parameter_event_subscriber_ = this->create_subscription<rcl_interfaces::msg::ParameterEvent>(
+            "/parameter_events", 10,
+            std::bind(&PiPuckRos2::updateParameterCb, this, std::placeholders::_1)
+        );
+    // param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
+    // cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("right_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("left_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_speaker_sound_id_ = param_subscriber_->add_parameter_callback("speaker_sound_id",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_normal_led_ = param_subscriber_->add_parameter_callback("normal_led",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_rgb_led_2_ = param_subscriber_->add_parameter_callback("rgb_led_2",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_rgb_led_4_ = param_subscriber_->add_parameter_callback("rgb_led_4",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_rgb_led_6_ = param_subscriber_->add_parameter_callback("rgb_led_6",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_rgb_led_8_ = param_subscriber_->add_parameter_callback("rgb_led_8",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
+    // cb_settings_ = param_subscriber_->add_parameter_callback("settings",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
 
     broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
@@ -61,57 +65,59 @@ PiPuckRos2::~PiPuckRos2() {
     close(fh);
 }
 
-void PiPuckRos2::updateParameterCb(const rclcpp::Parameter & p) {
-    if(p.get_name() == "right_motor_speed") {
-        right_motor_speed_ = p.as_int();
-        ros_to_epuck_[2] = right_motor_speed_&0xFF;
-		ros_to_epuck_[3] = right_motor_speed_>>8;
+void PiPuckRos2::updateParameterCb(const rcl_interfaces::msg::ParameterEvent::SharedPtr event) {
+    for (const auto & changed_parameter : event->changed_parameters)   {
+        if(changed_parameter.name == "right_motor_speed") {
+            right_motor_speed_ = changed_parameter.integer_value;
+            ros_to_epuck_[2] = right_motor_speed_&0xFF;
+            ros_to_epuck_[3] = right_motor_speed_>>8;
 
-    }
-    else if(p.get_name() == "left_motor_speed") {
-        left_motor_speed_ = p.as_int();
-        ros_to_epuck_[0] = left_motor_speed_&0xFF;
-		ros_to_epuck_[1] = left_motor_speed_>>8;
-    }
-    else if(p.get_name() == "speaker_sound_id") {
-        speaker_sound_id_ = p.as_int();
-        ros_to_epuck_[4] = speaker_sound_id_;
-    }
-    else if(p.get_name() == "normal_led") {
-        normal_led_ = p.as_int();
-        ros_to_epuck_[5] = normal_led_;
-    }
-    else if(p.get_name() == "rgb_led_2") {
-        std::vector<long> new_values_ = p.as_integer_array();
-        std::copy(new_values_.begin(),new_values_.end(),rgb_led_2_);
-        ros_to_epuck_[6] = rgb_led_2_[0];
-        ros_to_epuck_[7] = rgb_led_2_[1];
-        ros_to_epuck_[8] = rgb_led_2_[2];
-    }
-    else if(p.get_name() == "rgb_led_4") {
-        std::vector<long> new_values_ = p.as_integer_array();
-        std::copy(new_values_.begin(),new_values_.end(),rgb_led_4_);
-        ros_to_epuck_[9] = rgb_led_4_[0];
-        ros_to_epuck_[10] = rgb_led_4_[1];
-        ros_to_epuck_[11] = rgb_led_4_[2];
-    }
-    else if(p.get_name() == "rgb_led_6") {
-        std::vector<long> new_values_ = p.as_integer_array();
-        std::copy(new_values_.begin(),new_values_.end(),rgb_led_6_);
-        ros_to_epuck_[12] = rgb_led_6_[0];
-        ros_to_epuck_[13] = rgb_led_6_[1];
-        ros_to_epuck_[14] = rgb_led_6_[2];
-    }
-    else if(p.get_name() == "rgb_led_8") {
-        std::vector<long> new_values_ = p.as_integer_array();
-        std::copy(new_values_.begin(),new_values_.end(),rgb_led_8_);
-        ros_to_epuck_[15] = rgb_led_8_[0];
-        ros_to_epuck_[16] = rgb_led_8_[1];
-        ros_to_epuck_[17] = rgb_led_8_[2];
-    }
-    else if(p.get_name() == "settings") {
-        settings_ = p.as_int();
-        ros_to_epuck_[18] = settings_;
+        }
+        else if(changed_parameter.name == "left_motor_speed") {
+            left_motor_speed_ = changed_parameter.integer_value;
+            ros_to_epuck_[0] = left_motor_speed_&0xFF;
+            ros_to_epuck_[1] = left_motor_speed_>>8;
+        }
+        else if(changed_parameter.name == "speaker_sound_id") {
+            speaker_sound_id_ = changed_parameter.integer_value;
+            ros_to_epuck_[4] = speaker_sound_id_;
+        }
+        else if(changed_parameter.name == "normal_led") {
+            normal_led_ = changed_parameter.integer_value;
+            ros_to_epuck_[5] = normal_led_;
+        }
+        else if(changed_parameter.name == "rgb_led_2") {
+            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::copy(new_values_.begin(),new_values_.end(),rgb_led_2_);
+            ros_to_epuck_[6] = rgb_led_2_[0];
+            ros_to_epuck_[7] = rgb_led_2_[1];
+            ros_to_epuck_[8] = rgb_led_2_[2];
+        }
+        else if(changed_parameter.name == "rgb_led_4") {
+            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::copy(new_values_.begin(),new_values_.end(),rgb_led_4_);
+            ros_to_epuck_[9] = rgb_led_4_[0];
+            ros_to_epuck_[10] = rgb_led_4_[1];
+            ros_to_epuck_[11] = rgb_led_4_[2];
+        }
+        else if(changed_parameter.name == "rgb_led_6") {
+            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::copy(new_values_.begin(),new_values_.end(),rgb_led_6_);
+            ros_to_epuck_[12] = rgb_led_6_[0];
+            ros_to_epuck_[13] = rgb_led_6_[1];
+            ros_to_epuck_[14] = rgb_led_6_[2];
+        }
+        else if(changed_parameter.name == "rgb_led_8") {
+            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::copy(new_values_.begin(),new_values_.end(),rgb_led_8_);
+            ros_to_epuck_[15] = rgb_led_8_[0];
+            ros_to_epuck_[16] = rgb_led_8_[1];
+            ros_to_epuck_[17] = rgb_led_8_[2];
+        }
+        else if(changed_parameter.name == "settings") {
+            settings_ = changed_parameter.integer_value;
+            ros_to_epuck_[18] = settings_;
+        }
     }
     return;
 }
@@ -252,9 +258,6 @@ void PiPuckRos2::proximityTf() {
 }
 
 void PiPuckRos2::publishImu() {
-    
-    uint8_t accData[6];
-    uint8_t gyroData[6];
 
     ioctl(fh, I2C_SLAVE, imu_addr);
 	
