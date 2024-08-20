@@ -4,19 +4,18 @@
 
 
 PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
-    this->declare_parameter<float>("xpos",0.0);
-    this->declare_parameter<float>("ypos",0.0);
+    this->declare_parameter<float>("xPos",0.0);
+    this->declare_parameter<float>("yPos",0.0);
     this->declare_parameter<float>("theta",0.0);
     this->declare_parameter<std::string>("epuck_name","epuck");
-    this->declare_parameter<bool>("imu",false);
+    this->declare_parameter<bool>("imu",true);
     this->declare_parameter<bool>("publish_tf",false);
-    this->declare_parameter<bool>("motor_speed",false);
-    this->declare_parameter<bool>("floor",false);
-    this->declare_parameter<bool>("proximity",false);
-    this->declare_parameter<bool>("motor_position",false);
-    this->declare_parameter<bool>("microphone",false);
+    this->declare_parameter<bool>("motor_speed",true);
+    this->declare_parameter<bool>("floor",true);
+    this->declare_parameter<bool>("proximity",true);
+    this->declare_parameter<bool>("motor_position",true);
+    this->declare_parameter<bool>("microphone",true);
     this->declare_parameter<int>("ros_rate",20);
-    this->declare_parameter<std::string>("epuck_name","");
     //Robot control parameters
     this->declare_parameter<int>("right_motor_speed",0);
     this->declare_parameter<int>("left_motor_speed",0);
@@ -68,54 +67,54 @@ PiPuckRos2::~PiPuckRos2() {
 void PiPuckRos2::updateParameterCb(const rcl_interfaces::msg::ParameterEvent::SharedPtr event) {
     for (const auto & changed_parameter : event->changed_parameters)   {
         if(changed_parameter.name == "right_motor_speed") {
-            right_motor_speed_ = changed_parameter.integer_value;
+            right_motor_speed_ = changed_parameter.value.integer_value;
             ros_to_epuck_[2] = right_motor_speed_&0xFF;
             ros_to_epuck_[3] = right_motor_speed_>>8;
 
         }
         else if(changed_parameter.name == "left_motor_speed") {
-            left_motor_speed_ = changed_parameter.integer_value;
+            left_motor_speed_ = changed_parameter.value.integer_value;
             ros_to_epuck_[0] = left_motor_speed_&0xFF;
             ros_to_epuck_[1] = left_motor_speed_>>8;
         }
         else if(changed_parameter.name == "speaker_sound_id") {
-            speaker_sound_id_ = changed_parameter.integer_value;
+            speaker_sound_id_ = changed_parameter.value.integer_value;
             ros_to_epuck_[4] = speaker_sound_id_;
         }
         else if(changed_parameter.name == "normal_led") {
-            normal_led_ = changed_parameter.integer_value;
+            normal_led_ = changed_parameter.value.integer_value;
             ros_to_epuck_[5] = normal_led_;
         }
         else if(changed_parameter.name == "rgb_led_2") {
-            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::vector<int64_t> new_values_ = changed_parameter.value.integer_array_value;
             std::copy(new_values_.begin(),new_values_.end(),rgb_led_2_);
             ros_to_epuck_[6] = rgb_led_2_[0];
             ros_to_epuck_[7] = rgb_led_2_[1];
             ros_to_epuck_[8] = rgb_led_2_[2];
         }
         else if(changed_parameter.name == "rgb_led_4") {
-            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::vector<int64_t> new_values_ = changed_parameter.value.integer_array_value;
             std::copy(new_values_.begin(),new_values_.end(),rgb_led_4_);
             ros_to_epuck_[9] = rgb_led_4_[0];
             ros_to_epuck_[10] = rgb_led_4_[1];
             ros_to_epuck_[11] = rgb_led_4_[2];
         }
         else if(changed_parameter.name == "rgb_led_6") {
-            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::vector<int64_t> new_values_ = changed_parameter.value.integer_array_value;
             std::copy(new_values_.begin(),new_values_.end(),rgb_led_6_);
             ros_to_epuck_[12] = rgb_led_6_[0];
             ros_to_epuck_[13] = rgb_led_6_[1];
             ros_to_epuck_[14] = rgb_led_6_[2];
         }
         else if(changed_parameter.name == "rgb_led_8") {
-            std::vector<int64_t> new_values_ = changed_parameter.integer_array_value;
+            std::vector<int64_t> new_values_ = changed_parameter.value.integer_array_value;
             std::copy(new_values_.begin(),new_values_.end(),rgb_led_8_);
             ros_to_epuck_[15] = rgb_led_8_[0];
             ros_to_epuck_[16] = rgb_led_8_[1];
             ros_to_epuck_[17] = rgb_led_8_[2];
         }
         else if(changed_parameter.name == "settings") {
-            settings_ = changed_parameter.integer_value;
+            settings_ = changed_parameter.value.integer_value;
             ros_to_epuck_[18] = settings_;
         }
     }
@@ -180,7 +179,7 @@ void PiPuckRos2::publishProximityData() {
             msg.max_range = 0.05;
             msg.min_range = 0.005;
 
-            int proxData = epuck_to_ros_[i * 2] | epuck_to_ros_ [(i * 2) + 1] << 8;
+            int proxData = (unsigned char) epuck_to_ros_[i * 2] | epuck_to_ros_ [(i * 2) + 1] << 8;
             if(proxData > 0) {
                 msg.range = 0.5/sqrt(proxData);  // Transform the analog value to a distance value in meters (given from field tests).
             } else {
@@ -203,7 +202,7 @@ void PiPuckRos2::publishMicrophoneData() {
     int offset = 32;
     for(int i = 0; i < 4 ; i++) {
         std_msgs::msg::Float32 msg;
-        msg.data = epuck_to_ros_[offset + (i * 2)] | epuck_to_ros_[offset + 1 + (i*2)] << 8;
+        msg.data = (unsigned char) epuck_to_ros_[offset + (i * 2)] | epuck_to_ros_[offset + 1 + (i*2)] << 8;
         mic_pub_[i] ->publish(msg);
     }
     return;
@@ -211,10 +210,10 @@ void PiPuckRos2::publishMicrophoneData() {
 
 void PiPuckRos2::publishMotorPosition() {
     std_msgs::msg::Int32 msg;
-    motorPositionData[0] = epuck_to_ros_[41] | epuck_to_ros_[42] << 8;
+    motorPositionData[0] = (unsigned char) epuck_to_ros_[41] | epuck_to_ros_[42] << 8;
     msg.data = motorPositionData[0];
     motor_state_left_pub_->publish(msg);
-    motorPositionData[1] = epuck_to_ros_[43] | epuck_to_ros_[44] << 8;
+    motorPositionData[1] = (unsigned char) epuck_to_ros_[43] | epuck_to_ros_[44] << 8;
     msg.data = motorPositionData[1];
     motor_state_right_pub_->publish(msg);
     return;
@@ -249,13 +248,42 @@ void PiPuckRos2::proximityTf() {
             msg.header.frame_id = "/base_prox" + std::to_string(i);
             msg.header.stamp = this->get_clock()->now();
             msg.child_frame_id = "/base_link";
-            msg.transform = tf2::toMsg(transform);
+            msg.transform = PiPuckRos2::toMsg(transform);
             broadcaster_->sendTransform(msg);
         }
         
         
     return;
 }
+
+// Helper functions cause the normal repo wont compile for shit
+geometry_msgs::msg::Transform PiPuckRos2::toMsg(const tf2::Transform& in)
+ {
+   geometry_msgs::msg::Transform out;
+   out.translation = PiPuckRos2::toMsg(in.getOrigin());
+   out.rotation = PiPuckRos2::toMsg(in.getRotation());
+   return out;
+ }
+
+geometry_msgs::msg::Quaternion PiPuckRos2::toMsg(const tf2::Quaternion& in)
+ {
+   geometry_msgs::msg::Quaternion out;
+   out.w = in.getW();
+   out.x = in.getX();
+   out.y = in.getY();
+   out.z = in.getZ();
+   return out;
+ }
+
+geometry_msgs::msg::Vector3 PiPuckRos2::toMsg(const tf2::Vector3& in)
+ {
+   geometry_msgs::msg::Vector3 out;
+   out.x = in.getX();
+   out.y = in.getY();
+   out.z = in.getZ();
+   return out;
+ }
+
 
 void PiPuckRos2::publishImu() {
 
@@ -303,7 +331,7 @@ void PiPuckRos2::publishImu() {
 
     tf2::Quaternion q;
     q.setRPY(0,0,0);
-    geometry_msgs::msg::Quaternion odomQuat = tf2::toMsg(q);
+    geometry_msgs::msg::Quaternion odomQuat = PiPuckRos2::toMsg(q);
     msg.orientation = odomQuat;
     msg.orientation_covariance[0] = 0.01;
     msg.orientation_covariance[1] = 0.0;
@@ -363,7 +391,7 @@ void PiPuckRos2::publishOdometry() {
     // Since all odometry is 6DOF we'll need a quaternion created from yaw.
     tf2::Quaternion q;
     q.setRPY(0,0,theta);
-    geometry_msgs::msg::Quaternion odomQuat = tf2::toMsg(q);
+    geometry_msgs::msg::Quaternion odomQuat = PiPuckRos2::toMsg(q);
     msg.pose.pose.orientation = odomQuat;
     currentTime = this->get_clock()->now();
     msg.twist.twist.linear.x = deltaSteps / ((currentTime-lastTime).seconds());   // "deltaSteps" is the linear distance covered in meters from the last update (delta distance);

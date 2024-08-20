@@ -13,7 +13,8 @@ find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
-find_package(i2c)
+#find_package(i2c REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 # building
 add_executable(${PROJECT_NAME}_node src/epuck_driver_cpp_ros2.cpp)
 target_include_directories(${PROJECT_NAME}_node PRIVATE include)
@@ -31,10 +32,10 @@ install(DIRECTORY launch
 DESTINATION share/${PROJECT_NAME})
 
 # Installing config files
-install(FILES
-	config/epuck_driver_cpp_ros2.yaml
-  	DESTINATION share/${PROJECT_NAME}/config/
-)
+#install(FILES
+#	config/epuck_driver_cpp_ros2.yaml
+#  	DESTINATION share/${PROJECT_NAME}/config/
+#)
 
 ament_target_dependencies(${PROJECT_NAME}_node 
 rclcpp
@@ -43,6 +44,7 @@ nav_msgs
 geometry_msgs
 std_msgs
 tf2_ros
+rcl_interfaces
 )
 
 ament_package() 
