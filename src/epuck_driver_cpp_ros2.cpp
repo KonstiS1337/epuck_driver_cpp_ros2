@@ -9,6 +9,7 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
     this->declare_parameter<float>("theta",0.0);
     this->declare_parameter<std::string>("epuck_name","epuck");
     this->declare_parameter<bool>("imu",true);
+    this->declare_parameter<bool>("odometry",true);
     this->declare_parameter<bool>("publish_tf",false);
     this->declare_parameter<bool>("motor_speed",true);
     this->declare_parameter<bool>("floor",true);
@@ -27,38 +28,73 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
     this->declare_parameter<std::vector<int64_t>>("rgb_led_8",std::vector<int64_t>{0,0,0});
     this->declare_parameter<int>("settings",0);
 
-    //adding parameter event handler to react to parameter updates
-    parameter_event_subscriber_ = this->create_subscription<rcl_interfaces::msg::ParameterEvent>(
-            "/parameter_events", 10,
-            std::bind(&PiPuckRos2::updateParameterCb, this, std::placeholders::_1)
-        );
-    // param_subscriber_ = std::make_shared<rclcpp::ParameterEventHandler>(this);
-    // cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("right_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_right_motor_speed_ = param_subscriber_->add_parameter_callback("left_motor_speed",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_speaker_sound_id_ = param_subscriber_->add_parameter_callback("speaker_sound_id",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_normal_led_ = param_subscriber_->add_parameter_callback("normal_led",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_rgb_led_2_ = param_subscriber_->add_parameter_callback("rgb_led_2",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_rgb_led_4_ = param_subscriber_->add_parameter_callback("rgb_led_4",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_rgb_led_6_ = param_subscriber_->add_parameter_callback("rgb_led_6",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_rgb_led_8_ = param_subscriber_->add_parameter_callback("rgb_led_8",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-    // cb_settings_ = param_subscriber_->add_parameter_callback("settings",std::bind(&PiPuckRos2::updateParameterCb,this,std::placeholders::_1));
-
+    //adding srv in order to control the robot
+    std::string epuck_name = this->get_parameter("epuck_name").as_string();
+    robot_control_srv_ = this->create_service<epuck_driver_cpp_ros2::srv::ChangeRobotState>(epuck_name + "/robot_control", std::bind(&PiPuckRos2::serviceCB, this, std::placeholders::_1, std::placeholders::_2));
+    
     broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
     // Pubs, subs and timers
-    std::string epuck_name = this->get_parameter("epuck_name").as_string();
     for( int i = 0; i < 8; i++) prox_pub_[i] = this->create_publisher<sensor_msgs::msg::Range>(epuck_name + "/proximity_sensor_" + std::to_string(i),1);
     for( int i = 0; i < 4; i++) mic_pub_[i] = this->create_publisher<std_msgs::msg::Float32>(epuck_name + "/microphone_" + std::to_string(i),1);
     motor_state_right_pub_ = this->create_publisher<std_msgs::msg::Int32>(epuck_name + "/motor_state_right",1);
     motor_state_left_pub_ = this->create_publisher<std_msgs::msg::Int32>(epuck_name + "/motor_state_left",1);
     odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(epuck_name + "/odom",1);
+    imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>(epuck_name + "/imu",1);
     timer_ = this->create_wall_timer(std::chrono::milliseconds(100),std::bind(&PiPuckRos2::updateRobotState,this));
 
     //Loading values
     theta = this->get_parameter("theta").as_double();
     xPos = this->get_parameter("xPos").as_double();
     yPos = this->get_parameter("yPos").as_double();
+
+    initialized_ = true;
 }
+
+void PiPuckRos2::serviceCB(const std::shared_ptr<epuck_driver_cpp_ros2::srv::ChangeRobotState::Request> request, std::shared_ptr<epuck_driver_cpp_ros2::srv::ChangeRobotState::Response> response) {
+    switch (request->module)
+    {
+    case 0: 
+        ros_to_epuck_[2] = request->value&0xFF;
+        ros_to_epuck_[3] = request->value>>8;
+        break;
+    case 1: 
+        ros_to_epuck_[0] = request->value&0xFF;
+        ros_to_epuck_[1] = request->value>>8;
+        break;
+    case 2: 
+        ros_to_epuck_[5] = request->value;
+        break;
+    case 3: 
+        ros_to_epuck_[4] = request->value;
+        break;
+    case 4: 
+        ros_to_epuck_[6] = request->rgb[0];
+        ros_to_epuck_[7] = request->rgb[1];
+        ros_to_epuck_[8] = request->rgb[2];
+        break;
+    case 5: 
+        ros_to_epuck_[9] = request->rgb[0];
+        ros_to_epuck_[10] = request->rgb[1];
+        ros_to_epuck_[11] = request->rgb[2];
+        break;
+    case 6: 
+        ros_to_epuck_[12] = request->rgb[0];
+        ros_to_epuck_[13] = request->rgb[1];
+        ros_to_epuck_[14] = request->rgb[2];
+        break;
+    case 7: 
+        ros_to_epuck_[15] = request->rgb[0];
+        ros_to_epuck_[16] = request->rgb[1];
+        ros_to_epuck_[17] = request->rgb[2];
+        break;
+    default:
+        break;
+    }
+    response->success = true;
+    return;
+}
+
 
 PiPuckRos2::~PiPuckRos2() {
     close(fh);
@@ -68,8 +104,8 @@ void PiPuckRos2::updateParameterCb(const rcl_interfaces::msg::ParameterEvent::Sh
     for (const auto & changed_parameter : event->changed_parameters)   {
         if(changed_parameter.name == "right_motor_speed") {
             right_motor_speed_ = changed_parameter.value.integer_value;
-            ros_to_epuck_[2] = right_motor_speed_&0xFF;
-            ros_to_epuck_[3] = right_motor_speed_>>8;
+                ros_to_epuck_[2] = right_motor_speed_&0xFF;
+                ros_to_epuck_[3] = right_motor_speed_>>8;
 
         }
         else if(changed_parameter.name == "left_motor_speed") {
@@ -285,6 +321,7 @@ geometry_msgs::msg::Vector3 PiPuckRos2::toMsg(const tf2::Vector3& in)
  }
 
 
+
 void PiPuckRos2::publishImu() {
 
     ioctl(fh, I2C_SLAVE, imu_addr);
@@ -394,9 +431,14 @@ void PiPuckRos2::publishOdometry() {
     geometry_msgs::msg::Quaternion odomQuat = PiPuckRos2::toMsg(q);
     msg.pose.pose.orientation = odomQuat;
     currentTime = this->get_clock()->now();
-    msg.twist.twist.linear.x = deltaSteps / ((currentTime-lastTime).seconds());   // "deltaSteps" is the linear distance covered in meters from the last update (delta distance);
-                                                                                    // the time from the last update is measured in seconds thus to get m/s we multiply them.
-    msg.twist.twist.angular.z = deltaTheta / ((currentTime-lastTime).seconds());  // "deltaTheta" is the angular distance covered in radiant from the last update (delta angle);
+    try {
+        msg.twist.twist.linear.x = deltaSteps / ((currentTime-lastTime).seconds());   // "deltaSteps" is the linear distance covered in meters from the last update (delta distance);
+                                                                                        // the time from the last update is measured in seconds thus to get m/s we multiply them.
+        msg.twist.twist.angular.z = deltaTheta / ((currentTime-lastTime).seconds());  // "deltaTheta" is the angular distance covered in radiant from the last update (delta angle);
+    }
+    catch(std::runtime_error &e) {
+        RCLCPP_ERROR(this->get_logger(),"Timing error");
+    }
                                                                                     // the time from the last update is measured in seconds thus to get rad/s we multiply them.
     lastTime = this->get_clock()->now();
 
@@ -415,7 +457,8 @@ void PiPuckRos2::publishOdometry() {
 }
 
 void PiPuckRos2::updateRobotState() {
-
+    RCLCPP_INFO(this->get_logger(),"Updating robot state");
+    if(!rclcpp::ok()) return;
     //Setting up memory
     memset(epuck_to_ros_,0x0,SENSORS_SIZE);
     uint8_t checksum = 0;
@@ -486,6 +529,7 @@ bool PiPuckRos2::i2cDataExchange() {
 }
 
 void PiPuckRos2::calibrateAcc() {
+    RCLCPP_INFO(this->get_logger(),"In calib acc");
 	int samplesCount=0, i=0;
 	// reset and send configuration first?
 	for(i=0; i<NUM_SAMPLES_CALIBRATION; i++) {
@@ -505,6 +549,7 @@ void PiPuckRos2::calibrateAcc() {
 }
 
 void PiPuckRos2::calibrateGyro() {
+    RCLCPP_INFO(this->get_logger(),"In calib gyro");
 	int samplesCount=0, i=0;
 	// reset and send configuration first?
 	for(i=0; i<NUM_SAMPLES_CALIBRATION; i++) {
@@ -525,8 +570,8 @@ void PiPuckRos2::calibrateGyro() {
 int main(int argc,char *argv[]) {
     rclcpp::init(argc, argv);
     std::shared_ptr<PiPuckRos2> node = std::make_shared<PiPuckRos2>();
-
     if(node->initialize()) {
+        RCLCPP_INFO(node->get_logger(),"Start spinning of node.");
 		rclcpp::spin(node);
     }
     else RCLCPP_ERROR(node->get_logger(),"Initialization of node failed -> shuting down.");
