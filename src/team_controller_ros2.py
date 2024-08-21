@@ -5,6 +5,7 @@ from std_msgs.msg import Float32
 import math
 import numpy as np
 from simplex import *
+import threading
 
 
 def vector_from_angle(ori):
@@ -23,6 +24,16 @@ def get_triangle_positions(element_distance):
         
         a = element_distance/(2 * math.sin(math.pi/3))
         return directions * a + center
+
+
+def create_stage_executer(function, done_target, rate):
+
+    def stage_executer():
+        function()
+        while not done_target.is_set() and rclpy.ok():
+            rate.sleep()
+    
+    return stage_executer
 
 
 class TeamController(Node):
@@ -47,6 +58,9 @@ class TeamController(Node):
 
         self.is_converged = False
 
+        self.sound_localization_done = threading.Event()
+        self.formation_translation_done = threading.Event()
+
     def create_microphone_data_callback(self, robot_id, mic_id):
          
         def callback(data):
@@ -62,12 +76,17 @@ class TeamController(Node):
                    self.microphone_buffers[id][k].clear()
 
     def init_sound_localization(self):
+
         self.clear_buffers() 
+        self.sound_collection_done.clear()
         self.record = True
-        self.timer = self.create_timer(self.record_time, self.sound_localization)
+
+        self.timer = self.create_timer(self.record_time, self.sound_localization())
+
 
     def issue_triangle_translation(self, direction):
-        
+
+        self.formation_translation_done.clear()
         d_theta = math.atan2(direction[1], direction[0])
 
     # using averaging strategy for now
@@ -92,23 +111,53 @@ class TeamController(Node):
                 self.is_converged = True
         self.prev_mov_dir = mov_dir
 
-        if not self.is_converged:
-            self.issue_triangle_translation(mov_dir)
+        self.sound_localization_done.set()
+
+
+
+    def main_control_loop(self, rate):
+
+        # 1. Stage: Optimize Formation
+        # 2. Stage: Do soundlocalizaton and check convergence
+        # 3. Stage: translate Formation
+        stage_executers = [create_stage_executer(self.init_sound_localization(), self.sound_localization_done, rate),
+                           create_stage_executer(self.issue_triangle_translation(), self.formation_translation_done, rate)]
+
+        while not self.is_converged:
+            
+            for stage_executer in stage_executers:  
+                stage_executer()
+
+                if not rclpy.ok():
+                    raise KeyboardInterrupt
+
+
              
              
 def main(args=None):
     rclpy.init(args=args)
 
-    minimal_publisher = MinimalPublisher()
+    team_controller = TeamController()
 
-    rclpy.spin(minimal_publisher)
+    #rclpy.spin(TeamController)
+
+    thread = threading.Thread(target=rclpy.spin, args=(team_controller, ), daemon=True)
+    thread.start()
+
+    rate = team_controller.create_rate(10)
+    try:
+        team_controller.main_control_loop(rate)
+    except KeyboardInterrupt:
+        pass
+   
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    minimal_publisher.destroy_node()
+    thread.join()
+    thread.destroy_node()
     rclpy.shutdown()
-
+    
 
 if __name__ == '__main__':
     main()
