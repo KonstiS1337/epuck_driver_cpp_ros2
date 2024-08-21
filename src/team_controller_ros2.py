@@ -7,6 +7,8 @@ import numpy as np
 from simplex import *
 import threading
 
+from epuck_driver_interfaces.action import SimpleMovement
+from rclpy.action import ActionClient
 
 def vector_from_angle(ori):
      return np.array([math.cos(ori),math.sin(ori)])
@@ -25,20 +27,19 @@ def get_triangle_positions(element_distance):
         a = element_distance/(2 * math.sin(math.pi/3))
         return directions * a + center
 
+def send_movement_goal(client, angle, distance):
 
-def create_stage_executer(function, done_target, rate):
+    goal_msg = SimpleMovement.Goal()
+    goal_msg.angle = angle
+    goal_msg.distance = distance
 
-    def stage_executer():
-        function()
-        while not done_target.is_set() and rclpy.ok():
-            rate.sleep()
+    if not client.wait_for_server(5):
+        raise Exception("Timeout on movement control action server")
     
-    return stage_executer
+    return client.send_goal_async()
 
 
 class TeamController(Node):
-
-
 
     def __init__(self):
         super().__init__('TeamController')
@@ -60,6 +61,11 @@ class TeamController(Node):
 
         self.sound_localization_done = threading.Event()
         self.formation_translation_done = threading.Event()
+
+        self.movement_controller_action_clients = [ActionClient(SimpleMovement, "{}/movement_goal".format(id)) for id in self.robot_ids]
+
+
+
 
     def create_microphone_data_callback(self, robot_id, mic_id):
          
@@ -88,6 +94,11 @@ class TeamController(Node):
 
         self.formation_translation_done.clear()
         d_theta = math.atan2(direction[1], direction[0])
+
+        futures = [send_movement_goal(action_client, d_theta, self.step_distance) for action_client in self.movement_controller_action_clients]
+        for future, action_client in zip(futures, self.movement_controller_action_clients):
+            rclpy.spin_until_future_complete(action_client, future)
+
 
     # using averaging strategy for now
     def sound_localization(self):
@@ -120,16 +131,20 @@ class TeamController(Node):
         # 1. Stage: Optimize Formation
         # 2. Stage: Do soundlocalizaton and check convergence
         # 3. Stage: translate Formation
-        stage_executers = [create_stage_executer(self.init_sound_localization(), self.sound_localization_done, rate),
-                           create_stage_executer(self.issue_triangle_translation(), self.formation_translation_done, rate)]
+        
+                           #create_stage_executer(, self.formation_translation_done, rate)]
 
         while not self.is_converged:
             
-            for stage_executer in stage_executers:  
-                stage_executer()
+            self.init_sound_localization()
 
-                if not rclpy.ok():
-                    raise KeyboardInterrupt
+            while not self.sound_localization_done and rclpy.ok():
+                rate.sleep()
+            
+            if not rclpy.ok():
+                break
+
+            self.issue_triangle_translation()
 
 
              
