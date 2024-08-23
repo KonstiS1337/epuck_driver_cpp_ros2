@@ -15,17 +15,18 @@ find_package(std_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 #find_package(i2c REQUIRED)
 find_package(rcl_interfaces REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
+#find_package(rosidl_default_generators REQUIRED)
+find_package(epuck_driver_interfaces)
 
 # building
-#add_executable(${PROJECT_NAME}_node src/epuck_driver_cpp_ros2.cpp)
-#target_include_directories(${PROJECT_NAME}_node PRIVATE include)
-#target_link_libraries(${PROJECT_NAME}_node i2c)
+add_executable(${PROJECT_NAME}_node src/epuck_driver_cpp_ros2.cpp)
+target_include_directories(${PROJECT_NAME}_node PRIVATE include)
+target_link_libraries(${PROJECT_NAME}_node i2c)
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/ChangeRobotState.srv"
-  DEPENDENCIES std_msgs
-)
+#rosidl_generate_interfaces(${PROJECT_NAME}
+#  "srv/ChangeRobotState.srv"
+#  DEPENDENCIES std_msgs
+#)
 
 #rosidl_target_interfaces(${PROJECT_NAME}_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
@@ -36,8 +37,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 #)
 
 # Installing launch files
-#install(DIRECTORY launch
-#DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
 # Installing config files
 #install(FILES
@@ -45,15 +45,16 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 #  	DESTINATION share/${PROJECT_NAME}/config/
 #)
 
-# ament_target_dependencies(${PROJECT_NAME}_node 
-# rclcpp
-# sensor_msgs
-# nav_msgs
-# geometry_msgs
-# std_msgs
-# tf2_ros
-# rcl_interfaces
-# )
+ament_target_dependencies(${PROJECT_NAME}_node 
+rclcpp
+sensor_msgs
+nav_msgs
+geometry_msgs
+std_msgs
+tf2_ros
+rcl_interfaces
+epuck_driver_interfaces
+)
 
 ament_export_dependencies(rosidl_default_runtime)
 

@@ -30,7 +30,7 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
 
     //adding srv in order to control the robot
     std::string epuck_name = this->get_parameter("epuck_name").as_string();
-    robot_control_srv_ = this->create_service<epuck_driver_cpp_ros2::srv::ChangeRobotState>(epuck_name + "/robot_control", std::bind(&PiPuckRos2::serviceCB, this, std::placeholders::_1, std::placeholders::_2));
+    robot_control_srv_ = this->create_service<epuck_driver_interfaces::srv::ChangeRobotState>(epuck_name + "/robot_control", std::bind(&PiPuckRos2::serviceCB, this, std::placeholders::_1, std::placeholders::_2));
     
     broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
@@ -51,7 +51,7 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
     initialized_ = true;
 }
 
-void PiPuckRos2::serviceCB(const std::shared_ptr<epuck_driver_cpp_ros2::srv::ChangeRobotState::Request> request, std::shared_ptr<epuck_driver_cpp_ros2::srv::ChangeRobotState::Response> response) {
+void PiPuckRos2::serviceCB(const std::shared_ptr<epuck_driver_interfaces::srv::ChangeRobotState::Request> request, std::shared_ptr<epuck_driver_interfaces::srv::ChangeRobotState::Response> response) {
     switch (request->module)
     {
     case 0: 

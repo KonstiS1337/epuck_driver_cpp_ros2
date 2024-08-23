@@ -21,7 +21,9 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2/convert.h>
-#include <epuck_driver_cpp_ros2/srv/change_robot_state.hpp>
+//#include <epuck_driver_cpp_ros2/srv/change_robot_state.hpp>
+//#include <epuck_driver_cpp_ros2/srv/ChangeRobotState.srv>
+#include <epuck_driver_interfaces/srv/change_robot_state.hpp>
 
 extern "C"{
     #include <linux/i2c-dev.h>
@@ -127,7 +129,7 @@ class PiPuckRos2 : public rclcpp::Node {
 		rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr motor_state_left_pub_;
 		rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
 		rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
-		rclcpp::Service<epuck_driver_cpp_ros2::srv::ChangeRobotState>::SharedPtr robot_control_srv_;
+		rclcpp::Service<epuck_driver_interfaces::srv::ChangeRobotState>::SharedPtr robot_control_srv_;
 		//rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr parameter_event_subscriber_;
 		//std::shared_ptr<rclcpp::ParameterEventHandler> param_subscriber_;
 		//std::shared_ptr<rclcpp::ParameterCallbackHandle> cb_right_motor_speed_, cb_left_motor_speed_, cb_speaker_sound_id_, cb_normal_led_, cb_rgb_led_2_, cb_rgb_led_4_, cb_rgb_led_6_, cb_rgb_led_8_, cb_settings_;
@@ -167,7 +169,7 @@ class PiPuckRos2 : public rclcpp::Node {
 		void updateParameterCb(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
 		void calibrateGyro();
 		void calibrateAcc();
-		void serviceCB(const std::shared_ptr<epuck_driver_cpp_ros2::srv::ChangeRobotState::Request> request, std::shared_ptr<epuck_driver_cpp_ros2::srv::ChangeRobotState::Response> response);
+		void serviceCB(const std::shared_ptr<epuck_driver_interfaces::srv::ChangeRobotState::Request> request, std::shared_ptr<epuck_driver_interfaces::srv::ChangeRobotState::Response> response);
 		//Helper
 
 		geometry_msgs::msg::Quaternion toMsg(const tf2::Quaternion& in);
