@@ -23,18 +23,11 @@ add_executable(${PROJECT_NAME}_node src/epuck_driver_cpp_ros2.cpp)
 target_include_directories(${PROJECT_NAME}_node PRIVATE include)
 target_link_libraries(${PROJECT_NAME}_node i2c)
 
-#rosidl_generate_interfaces(${PROJECT_NAME}
-#  "srv/ChangeRobotState.srv"
-#  DEPENDENCIES std_msgs
-#)
-
-#rosidl_target_interfaces(${PROJECT_NAME}_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
 # Installing node
-#install(TARGETS
-#${PROJECT_NAME}_node
-#DESTINATION lib/${PROJECT_NAME}
-#)
+install(TARGETS
+${PROJECT_NAME}_node
+DESTINATION lib/${PROJECT_NAME}
+)
 
 # Installing launch files
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
