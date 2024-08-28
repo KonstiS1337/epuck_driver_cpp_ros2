@@ -10,7 +10,7 @@ PiPuckRos2::PiPuckRos2() : Node("pipuck_to_ros2") {
     this->declare_parameter<std::string>("epuck_name","epuck");
     this->declare_parameter<bool>("imu",true);
     this->declare_parameter<bool>("odometry",true);
-    this->declare_parameter<bool>("publish_tf",false);
+    this->declare_parameter<bool>("publish_tf",true);
     this->declare_parameter<bool>("motor_speed",true);
     this->declare_parameter<bool>("floor",true);
     this->declare_parameter<bool>("proximity",true);
@@ -281,9 +281,9 @@ void PiPuckRos2::proximityTf() {
             q.setRPY(0, 0, rpy_data_[i]);
             transform.setRotation(q);
             geometry_msgs::msg::TransformStamped msg;
-            msg.header.frame_id = "/base_prox" + std::to_string(i);
+            msg.header.frame_id = "/base_link";
             msg.header.stamp = this->get_clock()->now();
-            msg.child_frame_id = "/base_link";
+            msg.child_frame_id = "/base_prox" + std::to_string(i);
             msg.transform = PiPuckRos2::toMsg(transform);
             broadcaster_->sendTransform(msg);
         }
@@ -420,8 +420,8 @@ void PiPuckRos2::publishOdometry() {
     nav_msgs::msg::Odometry msg;
 
     msg.header.stamp = this->get_clock()->now();
-    msg.header.frame_id = "odom";
-    msg.child_frame_id = "/base_link";
+    msg.header.frame_id = "/base_link"; 
+    msg.child_frame_id = "odom";
     msg.pose.pose.position.x = xPos;       
     msg.pose.pose.position.y = yPos;
     msg.pose.pose.position.z = 0;
