@@ -40,12 +40,12 @@ def generate_launch_description():
                         ]
         ),
         Node(
-            package="epuck_ro2_camera",
+            package="epuck_ros2_camera",
             executable="camera",
             name = "epuck_camera_node_{}".format(epuck_name),
             namespace = epuck_name,
             parameters=[
                 {'epuck_name': epuck_name} # add more parameters here if needed
                         ]
-        )
+        )  
     ])
