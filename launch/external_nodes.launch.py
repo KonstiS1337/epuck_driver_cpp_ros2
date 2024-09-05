@@ -3,8 +3,8 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
 
-epuck_names = ['epuck1']#, 'epuck2', 'epuck3']
-corresponding_ball_colors = ["red"] #, "blue", "green"]
+epuck_names = ['epuck1', 'epuck2', 'epuck3']
+corresponding_ball_colors = ["blue" , "green", "red"]
 
 
 def generate_launch_description():
@@ -17,14 +17,14 @@ def generate_launch_description():
                 {'robot_names': epuck_names}, # add more parameters here if needed
                 {'corresponding_colors': corresponding_ball_colors}]
         ),
-        #Node(
-        #    package="formation_calibration_action_server",
-        #    executable="formation_calibration",
-        #    name = "formation_calibration_node",
-        #    parameters=[
-        #        {'robot_names': epuck_names} # add more parameters here if needed
-        #                ]
-        #),
+        Node(
+            package="formation_calibration_action_server",
+            executable="formation_calibration",
+            name = "formation_calibration_node",
+            parameters=[
+                {'robot_names': epuck_names} # add more parameters here if needed
+                        ]
+        ),
         Node(
             package="epuck_sound_data_collector",
             executable="epuck_sound_collection_action_server",

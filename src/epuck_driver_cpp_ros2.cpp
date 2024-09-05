@@ -457,7 +457,7 @@ void PiPuckRos2::publishOdometry() {
 }
 
 void PiPuckRos2::updateRobotState() {
-    RCLCPP_INFO(this->get_logger(),"Updating robot state");
+    //RCLCPP_INFO(this->get_logger(),"Updating robot state");
     if(!rclcpp::ok()) return;
     //Setting up memory
     memset(epuck_to_ros_,0x0,SENSORS_SIZE);
